@@ -176,6 +176,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ answer: finalText, messages, trace });
   } catch (err) {
+    // Surfaces in Vercel's Runtime Logs — the trace array only reaches the
+    // caller, so without this a failing deployment has no server-side signal.
+    console.error("[/api/chat] chat turn failed:", err);
     trace.push({
       section: "ERROR",
       label: "chat turn failed",

@@ -211,6 +211,23 @@ src/
 
 `npm run build` for a production build, `npm run lint` for ESLint.
 
+## Observability
+
+The app ships with [Vercel Web Analytics](https://vercel.com/docs/analytics) and
+[Speed Insights](https://vercel.com/docs/speed-insights) (`<Analytics />` / `<SpeedInsights />` in
+`src/app/layout.tsx`). Both are no-ops until the project is deployed on Vercel — nothing to
+configure, no keys, and they add nothing to local `npm run dev`. Once deployed, traffic and Core
+Web Vitals show up under the project's **Analytics** and **Speed Insights** tabs.
+
+Both API routes also `console.error` on failure before returning the error response. The `trace`
+array in the response is the only thing the *caller* sees; without a server-side log line, a
+failing deployment is invisible to you unless a user reports it. These show up under the project's
+**Logs** tab (or `vercel logs` from the CLI). Only the error itself is logged — never a credential,
+since none of the caller-supplied secrets are ever included in a thrown error's message.
+
+If you deploy elsewhere (not Vercel), the Analytics/Speed Insights components render nothing and
+the `console.error` calls just go to whatever captures your process's stderr.
+
 ## Credential handling
 
 **By design, this app has no server-side credential fallback.** There is no `ANTHROPIC_API_KEY`
