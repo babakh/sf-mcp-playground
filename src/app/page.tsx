@@ -83,6 +83,18 @@ export default function Home() {
   const [now, setNow] = useState(() => Date.now());
 
   const transcriptRef = useRef<HTMLDivElement>(null);
+  // Snapshot of the committed auth state, taken when "Change" opens the form.
+  // "Cancel" restores it, so abandoning an edit can't leave a corrupted field
+  // or a stale minted token behind.
+  const authSnapshotRef = useRef<{
+    authMethod: AuthMethod;
+    accessToken: string;
+    loginUrl: string;
+    clientId: string;
+    clientSecret: string;
+    resolvedAccessToken: string | null;
+    tokenExpiresAt: number | null;
+  } | null>(null);
 
   const [trace, setTrace] = useState<TraceEvent[]>([]);
 
@@ -304,6 +316,40 @@ export default function Home() {
     window.location.reload();
   }
 
+  /**
+   * Opening the form snapshots the committed auth state; canceling restores
+   * it verbatim (fields, auth method, and any already-minted token), so an
+   * abandoned edit can't leave a corrupted credential or a stale token behind
+   * while the card still claims "Authenticated".
+   */
+  function toggleEditingAuth() {
+    if (!editingAuth) {
+      authSnapshotRef.current = {
+        authMethod,
+        accessToken,
+        loginUrl,
+        clientId,
+        clientSecret,
+        resolvedAccessToken,
+        tokenExpiresAt,
+      };
+      setEditingAuth(true);
+      return;
+    }
+
+    const snapshot = authSnapshotRef.current;
+    if (snapshot) {
+      setAuthMethod(snapshot.authMethod);
+      setAccessToken(snapshot.accessToken);
+      setLoginUrl(snapshot.loginUrl);
+      setClientId(snapshot.clientId);
+      setClientSecret(snapshot.clientSecret);
+      setResolvedAccessToken(snapshot.resolvedAccessToken);
+      setTokenExpiresAt(snapshot.tokenExpiresAt);
+    }
+    setEditingAuth(false);
+  }
+
   async function copyToken() {
     if (!resolvedAccessToken) return;
     try {
@@ -438,10 +484,7 @@ export default function Home() {
                     {showAuthForm ? "Authenticate with Salesforce" : "Authenticated"}
                   </h2>
                   {connectResult && (
-                    <button
-                      onClick={() => setEditingAuth((v) => !v)}
-                      className="btn btn-quiet px-0"
-                    >
+                    <button onClick={toggleEditingAuth} className="btn btn-quiet px-0">
                       {editingAuth ? "Cancel" : "Change"}
                     </button>
                   )}
@@ -518,7 +561,11 @@ export default function Home() {
 
                     <div className="mb-4 flex border border-line bg-[var(--surface-panel)]">
                       <button
-                        onClick={() => setAuthMethod("token")}
+                        onClick={() => {
+                          setAuthMethod("token");
+                          setResolvedAccessToken(null);
+                          setTokenExpiresAt(null);
+                        }}
                         className={`btn flex-1 ${
                           authMethod === "token" ? "btn-contained" : "btn-quiet"
                         }`}
@@ -529,6 +576,7 @@ export default function Home() {
                         onClick={() => {
                           setAuthMethod("clientCredentials");
                           setResolvedAccessToken(null);
+                          setTokenExpiresAt(null);
                         }}
                         className={`btn flex-1 ${
                           authMethod === "clientCredentials" ? "btn-contained" : "btn-quiet"
