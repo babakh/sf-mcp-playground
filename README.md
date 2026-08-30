@@ -1,5 +1,8 @@
 # Salesforce MCP Playground
 
+*This is a reference implementation maintained on a best-effort basis. PRs welcome; response times
+vary.*
+
 A local web tool for exploring Salesforce's hosted **Model Context Protocol (MCP)** servers.
 Connect to an endpoint, inspect what it exposes, then chat against it with Claude — and watch
 every message on the wire in a live trace log.

@@ -234,6 +234,20 @@ export default function SetupPage() {
           ))}
         </div>
 
+        <div className="card-inset mb-10 flex flex-wrap items-center justify-between gap-4 px-4 py-3.5">
+          <span className="t-body2 text-muted">
+            Hit a bug, or does a step here not match what you see in Setup?
+          </span>
+          <a
+            href="https://github.com/babakh/sf-mcp-playground/issues/new"
+            target="_blank"
+            rel="noreferrer"
+            className="btn shrink-0"
+          >
+            Report an Issue
+          </a>
+        </div>
+
         <footer className="t-body2 border-t border-hairline pt-4 text-dim">
           Written for the Salesforce MCP Playground. Steps match Setup as of Summer &rsquo;26 &mdash;
           Salesforce occasionally renames these screens between releases.

@@ -387,14 +387,6 @@ export default function Home() {
             <Link href="/setup" target="_blank" className="btn btn-quiet px-0">
               Setup Guide
             </Link>
-            <button
-              onClick={handleReset}
-              onBlur={() => setConfirmReset(false)}
-              title="Clear saved settings and credentials from this browser"
-              className={`btn btn-quiet px-0 ${confirmReset ? "text-accent-coral" : ""}`}
-            >
-              {confirmReset ? "Confirm reset" : "Reset"}
-            </button>
             <a
               href="https://github.com/babakh/sf-mcp-playground"
               target="_blank"
@@ -406,6 +398,22 @@ export default function Home() {
               </svg>
               GitHub
             </a>
+            {/* Divider isolates the destructive action from the two navigational
+                links before it — same treatment as the brand-mark divider. Hidden
+                together with GitHub on narrow screens so it never appears orphaned. */}
+            <span className="hidden h-4 w-px bg-line md:block" />
+            <button
+              onClick={handleReset}
+              onBlur={() => setConfirmReset(false)}
+              title="Clear saved settings and credentials from this browser"
+              className={
+                confirmReset
+                  ? "btn border-accent-coral text-accent-coral hover:bg-transparent hover:text-accent-coral"
+                  : "btn btn-quiet px-0"
+              }
+            >
+              {confirmReset ? "Confirm reset" : "Reset"}
+            </button>
           </div>
         </div>
       </header>
