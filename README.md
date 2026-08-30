@@ -34,7 +34,8 @@ server-side. They are **stateless pass-throughs** — nothing is persisted betwe
 
 - **Node.js 20.9+** (required by Next.js 16)
 - An **Anthropic API key** — from [console.anthropic.com](https://console.anthropic.com/settings/keys)
-- A **Salesforce org** with the MCP endpoints enabled, plus credentials (see below)
+- A **Salesforce org** with the Hosted MCP server activated and an External Client App configured
+  — see [Salesforce org setup](#salesforce-org-setup)
 
 ## Getting started
 
@@ -55,20 +56,22 @@ You need two things: a way to authenticate to Salesforce, and an Anthropic API k
 
 ### Salesforce — option 1: access token
 
-The quickest path. If you have the Salesforce CLI set up:
+For a token you already hold. Paste it into the *Salesforce access token* field.
 
-```bash
-sf org display --target-org <your-alias> --verbose
-```
+**It must be a token minted from an External Client App with the `mcp_api` scope enabled** (see
+[Salesforce org setup](#salesforce-org-setup)). A general-purpose org token will authenticate and
+then fail at the MCP call — notably, the one from `sf org display` does not carry the scope and
+will not work here. In practice this means running
+the client-credentials exchange yourself, or using option 2 below and copying the token the app
+mints for you.
 
-Copy the **Access Token** into the *SF Access Token* field. Note that these expire — when calls
-start failing with a 401, re-run the command and paste a fresh one.
+Tokens expire on your org's session policy. When calls start failing with a 401, get a fresh one.
 
 ### Salesforce — option 2: client credentials
 
-Better for a session you don't want to keep re-authenticating. Requires a Connected App (or
-External Client App) in your org with the **OAuth 2.0 Client Credentials Flow** enabled and a
-run-as user assigned. Fill in:
+Better for a session you don't want to keep re-authenticating. Requires an **External Client App**
+set up per [Salesforce org setup](#salesforce-org-setup) below, with the client-credentials flow
+enabled and a run-as user assigned. Fill in:
 
 | Field | Value |
 |---|---|
@@ -80,13 +83,65 @@ The app exchanges these for a token at `<Login URL>/services/oauth2/token` on **
 reuses that token for Discover and Chat rather than re-running the exchange every request. Editing
 any of the three fields clears the cached token.
 
+The Login URL host is checked against an allowlist — it must be `salesforce.com` or a subdomain,
+over https. Without that, the field would let anyone POST from this server to any host they name
+(see `resolveLoginUrl` in `src/lib/config.ts`).
+
+After connecting, the minted token is shown in the collapsed auth card behind **Reveal** / **Copy**,
+along with its expiry where the org allows introspection. Copying it lets you skip the exchange on
+your next visit by pasting it under *Access Token*.
+
 The run-as user needs whatever permissions the endpoint's tools require — a read-only endpoint
 still needs object and field access to the data you ask about.
 
 ### Anthropic API key
 
-Paste into the *Anthropic API Key* field. Used only for the Chat panel; Connect and Discover
-work without it.
+Paste into the *Anthropic API key* field, in the Chat panel. It is not a Salesforce credential and
+is not needed to connect — Connect and Discover work without it.
+
+## Salesforce org setup
+
+One-time work in your org before any of this connects. The same steps are in the app, collapsed
+under *First time here?* in the authentication card.
+
+**Connected Apps are not supported for MCP authentication** — it must be an External Client App
+(ECA).
+
+1. **Activate the MCP server.** Setup → **MCP Servers** → **Salesforce Servers**. Pick the server
+   you want (e.g. `headless-360`), click **Activate**, and note its Server URL and API name. Prefer
+   a read-only server such as `sobject-reads` for a first test.
+2. **Create an External Client App.** Setup → **External Client App Manager** → **New External
+   Client App**. Fill in the name, API name, and contact email.
+3. **Enable OAuth.** Expand **API (Enable OAuth Settings)** and check **Enable OAuth**. Set a
+   Callback URL matching your client — `https://oauth.pstmn.io/v1/callback` works for testing.
+4. **Add the `mcp_api` scope** — *Access Salesforce Hosted MCP Servers*. This scope exists
+   precisely so you don't have to grant the far broader `api` scope (full Platform API access). Add
+   `refresh_token` / `offline_access` only if your client needs long-lived sessions.
+5. **Enable the client-credentials flow.** Check **Enable Client Credentials Flow** and choose a
+   **Run As** user. *Required for this app's Client Credentials tab* — without it, only the Access
+   Token tab works.
+6. **Save, then wait up to ~30 minutes.** An ECA takes time to propagate. Don't troubleshoot auth
+   failures until that window has passed.
+7. **Copy the Consumer Key and Secret.** The ECA → **Settings** → **OAuth Settings** → **Consumer
+   Key and Secret**; you may need to verify with an emailed code. The Consumer Key is the Client ID
+   this app asks for.
+8. *(Optional)* **Restrict access.** By default any org user can authenticate through the ECA. To
+   limit it, create a permission set scoped to the ECA, assign it to the intended users, and set an
+   app policy requiring pre-authorization.
+
+Worth knowing:
+
+- **One ECA per client type** (one for this app, one for Postman, and so on) — keeps permissions
+  and logging separate, per Salesforce's own recommendation.
+- **Calls run as the authenticated user**, not a shared integration account. Normal CRUD,
+  field-level security, and sharing rules apply on top of whatever the ECA scope allows.
+- **Tokens are Hosted-MCP-specific**, JWT-shaped bearer tokens. Don't reuse one minted for a
+  different OAuth flow.
+
+References: [Set Up Your Org — Hosted MCP Servers](https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_mcp_setup.htm)
+· [Create an External Client App](https://developer.salesforce.com/docs/atlas.en-us.oas.meta/oas/oas_external_client_app.htm)
+· [How to Secure Salesforce Hosted MCP Servers](https://developer.salesforce.com/blogs/2026/06/how-to-secure-salesforce-hosted-mcp-servers)
+· [Connect MCP Clients](https://developer.salesforce.com/docs/atlas.en-us.oas.meta/oas/oas_connect_mcp_clients.htm)
 
 ## Endpoints
 
@@ -111,18 +166,22 @@ these can modify or delete records in a real org.
 
 ## Using it
 
-**1. Connection** — pick an endpoint.
+**01 Select an MCP endpoint** — pick one from the dropdown. The URL it resolves to is shown
+beneath it.
 
-**2. Authentication** — choose Access Token or Client Credentials, fill it in, add your Anthropic
-key, and hit **Connect**. This performs the MCP `initialize` handshake only. On success you'll see
-the server name; the full handshake, including the server's declared capabilities and instructions,
-is in the Message Log.
+**02 Authenticate with Salesforce** — choose Access Token or Client Credentials, fill it in, and hit
+**Connect to MCP server**. This performs the MCP `initialize` handshake only. On success the card
+collapses to a summary — with the minted token, if the app fetched one — and **Change** reopens it.
+The full handshake, including the server's declared capabilities and instructions, is in the
+Message Log.
 
-**3. Introspection** — **Show Tools / Resources / Prompts** runs `tools/list`, `resources/list`, and
-`prompts/list`. Servers that don't implement resources or prompts are handled gracefully — the log
-records them as unsupported instead of failing the request.
+**03 Discover what the server offers** — **Show Tools / Resources / Prompts** runs `tools/list`,
+`resources/list`, and `prompts/list`, then reports the counts. Servers that don't implement
+resources or prompts are handled gracefully — the log records them as unsupported instead of
+failing the request.
 
-**Chat** — ask a question. The route sends your message to Claude with the endpoint's tools
+**Ask Claude to use the tools** — enter your Anthropic key and ask a question. The route sends your
+message to Claude with the endpoint's tools
 attached, executes any `tools/call` the model requests against the live MCP session, feeds results
 back, and repeats until the model produces an answer. The loop is capped at 10 tool-calling turns.
 
@@ -160,25 +219,39 @@ credential would be silently usable by every visitor — so callers must supply 
 
 What that means in practice:
 
-- Credentials live in React state in your browser tab. Refreshing or closing it clears them.
 - They are sent to this app's own API routes, which forward them to Salesforce and Anthropic.
   They are not written to a database, file, or server-side log.
-- Trace events sent back to the browser include the Client ID and, for the client-credentials
-  flow, the resolved access token — the client caches it to skip repeat exchanges. The client
-  secret is never returned.
+- **Non-secrets are remembered across visits** in `localStorage`: the selected endpoint, auth
+  method, Login URL, and Client ID. None of these is a credential on its own.
+- **Secrets are only remembered if you tick "Remember secrets in this tab"**, and then only in
+  `sessionStorage` — the access token, client secret, and Anthropic key survive a reload but are
+  gone when the tab closes. Unticking the box erases them immediately. `localStorage` is
+  deliberately not offered for these: this app is deployed publicly, and a Salesforce client
+  secret persisting indefinitely in a shared browser profile is not a sane default.
+- **Reset** in the header clears both tiers and reloads to first-run state. It takes two clicks
+  and is the only way to clear the `localStorage` tier from the UI — worth using before you hand
+  the machine to someone else.
+- Storage is not a security boundary — anything that can run JS on this origin can read React
+  state or the inputs directly. The two tiers control credential *lifetime*, which is the part
+  that actually differs. See `src/lib/persist.ts`.
+- Trace events include the token URL and Client ID, and — for the client-credentials flow — the
+  token's `instance_url`, `token_type`, and `issued_at`. **The access token itself is never put in
+  a trace event**, so the Message Log stays safe to screenshot or share. The client secret is never
+  returned at all.
+- The minted token *is* returned in the response body, so the browser can cache it across Discover
+  and Chat instead of re-running the exchange, and can show it to you behind **Reveal** / **Copy**.
 
 ## Known limitations
 
-Treat this as a local development tool, not something to expose publicly:
-
-- **The `loginUrl` field is unvalidated.** The server will POST to whatever host you give it and
-  return the response in the trace. On a public deployment that is a server-side request forgery
-  vector. Restrict it to Salesforce domains before hosting this anywhere.
 - **Tool results are parsed optimistically.** `src/app/api/chat/route.ts` assumes an array
   `content` and ignores the MCP `isError` flag, so a tool failure reaches the model as ordinary
   text and an unusual response shape can throw.
-- **No serverless timeout configured.** Neither route exports `maxDuration`; a long tool-calling
-  loop will exceed the default function timeout on a platform like Vercel.
 - **The pinned model is a generation behind.** `CLAUDE_MODEL` in `src/lib/config.ts` is
   `claude-sonnet-4-6`; `claude-sonnet-5` is both more capable and cheaper.
+- **Chat is not streamed.** The route waits for the full agentic loop before responding, so a
+  turn with several tool calls can leave the UI idle for 20+ seconds. `maxDuration` is set to
+  60s on both routes — the ceiling every Vercel plan accepts. Raise it toward your plan's limit
+  if long loops still get cut off.
+- **No rate limiting.** Anyone who opens the deployed URL can drive the routes. They can only
+  spend their own Salesforce and Anthropic credentials, but the endpoints themselves are open.
 - Chat history is client-side only and lost on refresh.

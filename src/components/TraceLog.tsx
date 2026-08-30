@@ -2,20 +2,29 @@
 
 import type { TraceEvent } from "@/lib/types";
 
-const CATEGORY_STYLES: Record<string, { badge: string; border: string }> = {
-  CONNECT: { badge: "bg-neutral-700 text-neutral-200", border: "border-l-neutral-500" },
-  AUTH: { badge: "bg-purple-900 text-purple-200", border: "border-l-purple-600" },
-  HANDSHAKE: { badge: "bg-emerald-900 text-emerald-200", border: "border-l-emerald-600" },
-  TOOLS: { badge: "bg-sky-900 text-sky-200", border: "border-l-sky-600" },
-  RESOURCES: { badge: "bg-sky-900 text-sky-200", border: "border-l-sky-600" },
-  PROMPTS: { badge: "bg-sky-900 text-sky-200", border: "border-l-sky-600" },
-  "CLAUDE REQUEST": { badge: "bg-indigo-900 text-indigo-200", border: "border-l-indigo-600" },
-  "CLAUDE RESPONSE": { badge: "bg-indigo-900 text-indigo-200", border: "border-l-indigo-600" },
-  "MCP CALL_TOOL": { badge: "bg-amber-900 text-amber-200", border: "border-l-amber-600" },
-  TIMING: { badge: "bg-teal-900 text-teal-200", border: "border-l-teal-600" },
-  ERROR: { badge: "bg-red-900 text-red-200", border: "border-l-red-600" },
+/** Category -> categorical accent from the brand's 8-colour dimension set. */
+const CATEGORY_COLORS: Record<string, string> = {
+  CONNECT: "var(--brand-slate-500)",
+  AUTH: "var(--accent-purple)",
+  HANDSHAKE: "var(--accent-green)",
+  TOOLS: "var(--accent-cyan)",
+  RESOURCES: "var(--accent-blue)",
+  PROMPTS: "var(--accent-pink)",
+  "CLAUDE REQUEST": "var(--accent-periwinkle)",
+  "CLAUDE RESPONSE": "var(--accent-periwinkle)",
+  "MCP CALL_TOOL": "var(--accent-amber)",
+  ERROR: "var(--accent-coral)",
 };
-const DEFAULT_STYLE = { badge: "bg-neutral-700 text-neutral-300", border: "border-l-neutral-600" };
+const DEFAULT_COLOR = "var(--brand-slate-500)";
+
+/** Flat badge: accent text on a translucent wash of the same accent, square, 1px rule. */
+function badgeStyle(color: string) {
+  return {
+    color,
+    backgroundColor: `color-mix(in srgb, ${color} 14%, transparent)`,
+    border: `1px solid color-mix(in srgb, ${color} 40%, transparent)`,
+  };
+}
 
 function categoryOf(section: string): string {
   return section.includes(":") ? section.split(":")[0].trim() : section;
@@ -69,6 +78,7 @@ function formatTime(ts?: number): string | null {
 type Group = {
   groupId: string;
   groupLabel: string;
+  durationMs?: number;
   events: TraceEvent[];
 };
 
@@ -81,7 +91,7 @@ function groupTrace(trace: TraceEvent[]): Group[] {
     const groupLabel = event.groupLabel ?? event.section;
     let group = byId.get(groupId);
     if (!group) {
-      group = { groupId, groupLabel, events: [] };
+      group = { groupId, groupLabel, durationMs: event.groupMs, events: [] };
       byId.set(groupId, group);
       groups.push(group);
     }
@@ -93,20 +103,27 @@ function groupTrace(trace: TraceEvent[]): Group[] {
 
 function EventEntry({ event }: { event: TraceEvent }) {
   const category = categoryOf(event.section);
-  const style = CATEGORY_STYLES[category] ?? DEFAULT_STYLE;
+  const color = CATEGORY_COLORS[category] ?? DEFAULT_COLOR;
   const summary = summarize(event);
   const isError = category === "ERROR";
 
   return (
-    <details open={isError} className={`rounded border border-neutral-700 border-l-4 bg-neutral-950 ${style.border}`}>
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm select-none">
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${style.badge}`}>
+    <details
+      open={isError}
+      className="border border-line bg-[var(--surface-panel)]"
+      style={{ borderLeft: `3px solid ${color}` }}
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 select-none">
+        <span
+          className="t-eyebrow shrink-0 px-1.5 py-0.5 text-[0.62rem]"
+          style={badgeStyle(color)}
+        >
           {category}
         </span>
-        <span className="truncate text-neutral-200">{event.label}</span>
-        {summary && <span className="truncate text-neutral-500">— {summary}</span>}
+        <span className="t-body2 truncate text-softer">{event.label}</span>
+        {summary && <span className="t-body2 truncate text-dim">— {summary}</span>}
       </summary>
-      <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words border-t border-neutral-700 p-3 text-xs text-neutral-300">
+      <pre className="max-h-96 overflow-auto border-t border-line p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words text-soft">
         {typeof event.data === "string" ? event.data : JSON.stringify(event.data, null, 2)}
       </pre>
     </details>
@@ -115,7 +132,12 @@ function EventEntry({ event }: { event: TraceEvent }) {
 
 export function TraceLog({ trace }: { trace: TraceEvent[] }) {
   if (!trace.length) {
-    return <p className="text-sm text-neutral-500">No messages exchanged yet.</p>;
+    return (
+      <p className="t-body2 text-dim">
+        Nothing on the wire yet. Connect above and the handshake, discovery calls, and every
+        Claude/MCP exchange will appear here.
+      </p>
+    );
   }
 
   const groups = groupTrace(trace);
@@ -124,26 +146,31 @@ export function TraceLog({ trace }: { trace: TraceEvent[] }) {
     <div className="flex max-h-[32rem] flex-col gap-2 overflow-auto">
       {groups.map((group) => {
         const hasError = group.events.some((e) => categoryOf(e.section) === "ERROR");
-        const timingEvent = group.events.find((e) => categoryOf(e.section) === "TIMING");
         const time = formatTime(group.events[0]?.timestamp);
+        const color = hasError ? "var(--accent-coral)" : "var(--brand-primary)";
 
         return (
-          <details key={group.groupId} className="rounded border border-neutral-700 bg-neutral-900">
-            <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm select-none">
+          <details key={group.groupId} className="card-inset">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 select-none">
               <span
-                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase ${
-                  hasError ? "bg-red-900 text-red-200" : "bg-blue-900 text-blue-200"
-                }`}
+                className="t-eyebrow shrink-0 px-1.5 py-0.5 text-[0.62rem]"
+                style={badgeStyle(color)}
               >
                 {group.events.length}
               </span>
-              <span className="truncate font-medium text-neutral-100">{group.groupLabel}</span>
-              {typeof timingEvent?.data === "string" && (
-                <span className="shrink-0 text-xs text-neutral-500">{timingEvent.data}</span>
+              <span className="t-body2 truncate font-bold">{group.groupLabel}</span>
+              {group.durationMs !== undefined && (
+                <span className="t-body2 shrink-0 text-dim">
+                  {group.durationMs.toFixed(0)} ms
+                </span>
               )}
-              {time && <span className="ml-auto shrink-0 pl-2 text-[10px] text-neutral-600">{time}</span>}
+              {time && (
+                <span className="ml-auto shrink-0 pl-2 font-mono text-[0.68rem] text-dimmer">
+                  {time}
+                </span>
+              )}
             </summary>
-            <div className="flex flex-col gap-2 border-t border-neutral-700 p-2">
+            <div className="flex flex-col gap-2 border-t border-line p-2">
               {group.events.map((event, i) => (
                 <EventEntry key={i} event={event} />
               ))}

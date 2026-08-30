@@ -5,6 +5,8 @@ export type TraceEvent = {
   timestamp?: number;
   groupId?: string;
   groupLabel?: string;
+  /** Wall-clock duration of the request this event belongs to, in ms. */
+  groupMs?: number;
 };
 
 export type ChatMessage = {

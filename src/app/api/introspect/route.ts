@@ -4,6 +4,9 @@ import { resolveMcpUrl } from "@/lib/config";
 import { resolveOrFetchAccessToken } from "@/lib/auth";
 import type { TraceEvent } from "@/lib/types";
 
+/** Token exchange + introspection + handshake + three list calls in one request. */
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const trace: TraceEvent[] = [];
@@ -11,7 +14,7 @@ export async function POST(request: Request) {
 
   try {
     const url = resolveMcpUrl(body.endpoint);
-    const accessToken = await resolveOrFetchAccessToken(
+    const { token: accessToken, issuedAt, expiresAt } = await resolveOrFetchAccessToken(
       { accessToken: body.accessToken, clientId: body.clientId, clientSecret: body.clientSecret, loginUrl: body.loginUrl },
       trace
     );
@@ -58,7 +61,7 @@ export async function POST(request: Request) {
       return { handshake, tools: tools.tools, resources, prompts };
     });
 
-    return NextResponse.json({ ...result, accessToken, trace });
+    return NextResponse.json({ ...result, accessToken, issuedAt, expiresAt, trace });
   } catch (err) {
     trace.push({
       section: "ERROR",

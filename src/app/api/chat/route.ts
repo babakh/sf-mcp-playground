@@ -18,6 +18,14 @@ type McpTool = {
 const MAX_TOOL_TURNS = 10;
 
 /**
+ * Without this the route inherits the platform default, which is well under the
+ * ~24s a single tool-calling turn already takes — chat would 504 when deployed
+ * while working fine locally. 60s is accepted on every Vercel plan; raise it
+ * toward your plan's ceiling (Pro allows more) if long loops still get cut off.
+ */
+export const maxDuration = 60;
+
+/**
  * Generous enough that a turn returning Salesforce records isn't cut off. Truncation
  * is not just ugly here — if generation stops mid-`tool_use`, `stop_reason` becomes
  * `max_tokens` and the loop below exits with a partial answer.
@@ -31,6 +39,29 @@ function toAnthropicTools(tools: McpTool[]): Anthropic.Tool[] {
     input_schema: tool.inputSchema as Anthropic.Tool.InputSchema,
   }));
 }
+
+/**
+ * Answers render in a narrow chat column, so the format is specified rather
+ * than left to the model. Wide markdown tables were unreadable there — the
+ * request is for scannable bullets instead.
+ */
+const SYSTEM_PROMPT = [
+  "You are a Salesforce assistant. You have tools that can discover and query real",
+  "Salesforce data through an MCP server. Use them whenever the user's request needs",
+  "data you don't already have. Prefer the read-only dispatch tool for anything that",
+  "only reads data.",
+  "",
+  "Format your answers for a narrow chat column:",
+  "- Do not use markdown tables. They are unreadable at this width.",
+  "- Present records as a bulleted list, one bullet per record: the record's name in",
+  "  bold, then the few fields that matter on the following line as `Label: value`",
+  "  pairs separated by a middle dot.",
+  "- Include only fields the user asked for or that identify the record. Do not dump",
+  "  every available field.",
+  "- Lead with the answer or a one-line count, not with preamble.",
+  "- Beyond about 10 records, list the most relevant and say how many you omitted.",
+  "- Use short paragraphs and bullets elsewhere. No decorative emoji.",
+].join("\n");
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -58,7 +89,7 @@ export async function POST(request: Request) {
 
   try {
     const mcpUrl = resolveMcpUrl(endpoint);
-    const token = await resolveOrFetchAccessToken({ accessToken, clientId, clientSecret, loginUrl }, trace);
+    const { token } = await resolveOrFetchAccessToken({ accessToken, clientId, clientSecret, loginUrl }, trace);
     const apiKey = resolveAnthropicKey(anthropicKey);
     const anthropic = new Anthropic({ apiKey });
 
@@ -74,11 +105,7 @@ export async function POST(request: Request) {
         const response = await anthropic.messages.create({
           model: CLAUDE_MODEL,
           max_tokens: MAX_TOKENS,
-          system:
-            "You are a Salesforce assistant. You have tools that can discover and " +
-            "query real Salesforce data through an MCP server. Use them whenever the " +
-            "user's request needs data you don't already have. Prefer the read-only " +
-            "dispatch tool for anything that only reads data.",
+          system: SYSTEM_PROMPT,
           tools: anthropicTools,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           messages: messages as any,

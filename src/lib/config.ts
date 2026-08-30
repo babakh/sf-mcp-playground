@@ -27,8 +27,43 @@ export function resolveAccessToken(token?: string): string | undefined {
   return token;
 }
 
+/**
+ * Hosts this app will POST credentials to. Without this allowlist the loginUrl
+ * field is a server-side request forgery vector: the route POSTs to whatever
+ * host the caller names and returns the response body in the trace, which on a
+ * public deployment makes it an open proxy anyone can drive.
+ *
+ * Matching is on the parsed hostname, so `https://evil.com/?x=.salesforce.com`,
+ * `https://salesforce.com.evil.com`, and `https://evil-salesforce.com` are all
+ * rejected. Every Salesforce OAuth token endpoint lives under .salesforce.com
+ * (login, test, and My Domain); extend this list if you need another.
+ */
+const ALLOWED_LOGIN_HOST = "salesforce.com";
+
 export function resolveLoginUrl(loginUrl?: string): string | undefined {
-  return loginUrl ? loginUrl.replace(/\/$/, "") : undefined;
+  if (!loginUrl) return undefined;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(loginUrl);
+  } catch {
+    throw new Error(`Login URL is not a valid URL: ${loginUrl}`);
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error("Login URL must use https.");
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (host !== ALLOWED_LOGIN_HOST && !host.endsWith(`.${ALLOWED_LOGIN_HOST}`)) {
+    throw new Error(
+      `Login URL host "${host}" is not a Salesforce domain. ` +
+        `Expected ${ALLOWED_LOGIN_HOST} or a subdomain of it, ` +
+        `e.g. https://<your-domain>.my.salesforce.com.`
+    );
+  }
+
+  return loginUrl.replace(/\/$/, "");
 }
 
 export function resolveClientId(clientId?: string): string | undefined {

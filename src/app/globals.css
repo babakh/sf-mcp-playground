@@ -1,26 +1,259 @@
 @import "tailwindcss";
 
+/* ------------------------------------------------------------------
+   DXSphere brand tokens
+   Flat, technical, blueprint-like: zero radius, no shadows, depth from
+   1px #334155 borders and translucent slate over a single background.
+   ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Core palette */
+  --brand-primary: #06b6d4;
+  --brand-primary-pressed: #0891b2;
+  --brand-bg: #0b1120;
+  --brand-text: #ffffff;
+  --brand-text-secondary: #94a3b8;
+  --brand-border: #334155;
+
+  /* Supporting neutrals */
+  --brand-slate-200: #e2e8f0;
+  --brand-slate-300: #cbd5e1;
+  --brand-slate-500: #64748b;
+  --brand-slate-600: #475569;
+
+  /* Categorical accents (assessment dimensions) */
+  --accent-pink: #e0729e;
+  --accent-cyan: #06b6d4;
+  --accent-blue: #4c8fe8;
+  --accent-purple: #a855f7;
+  --accent-periwinkle: #8b7ff0;
+  --accent-green: #22b893;
+  --accent-amber: #f0b23e;
+  --accent-coral: #f2716b;
+
+  /* Ordinal scale, low -> high */
+  --ordinal-1: #f2716b;
+  --ordinal-2: #f0b23e;
+  --ordinal-3: #06b6d4;
+  --ordinal-4: #22b893;
+
+  /* Surfaces: translucent slate rebased onto --brand-bg, so cards read flush
+     with the page and depth comes only from the 1px border. */
+  --surface-card: rgba(11, 17, 32, 0.42);
+  --surface-inset: rgba(11, 17, 32, 0.32);
+  --surface-panel: rgba(11, 17, 32, 0.26);
+  --surface-header: rgba(11, 17, 32, 0.82);
+  --surface-input: rgba(11, 17, 32, 0.5);
+  --surface-track: rgba(255, 255, 255, 0.08);
+  --grid-line: rgba(51, 65, 85, 0.15);
+  --grid-line-hero: rgba(51, 65, 85, 0.22);
+  --accent-hairline: rgba(6, 182, 212, 0.24);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--brand-bg);
+  --color-foreground: var(--brand-text);
+  --color-primary: var(--brand-primary);
+  --color-primary-pressed: var(--brand-primary-pressed);
+  --color-line: var(--brand-border);
+  --color-muted: var(--brand-text-secondary);
+  --color-soft: var(--brand-slate-300);
+  --color-softer: var(--brand-slate-200);
+  --color-dim: var(--brand-slate-500);
+  --color-dimmer: var(--brand-slate-600);
+
+  --color-surface: var(--surface-card);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-panel: var(--surface-panel);
+  --color-surface-input: var(--surface-input);
+  --color-track: var(--surface-track);
+  --color-hairline: var(--accent-hairline);
+
+  --color-accent-pink: var(--accent-pink);
+  --color-accent-cyan: var(--accent-cyan);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-periwinkle: var(--accent-periwinkle);
+  --color-accent-green: var(--accent-green);
+  --color-accent-amber: var(--accent-amber);
+  --color-accent-coral: var(--accent-coral);
+
+  --font-sans: var(--font-manrope), "IBM Plex Sans", sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  /* Zero border radius everywhere — depth comes from borders, not curves. */
+  --radius: 0px;
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background-color: var(--brand-bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--brand-text);
+  font-family: var(--font-manrope), "IBM Plex Sans", sans-serif;
+  line-height: 1.35;
+  /* Signature 36x36 hairline grid over the page background. */
+  background-color: var(--brand-bg);
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+/* No elevation anywhere. */
+*,
+*::before,
+*::after {
+  box-shadow: none;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@layer components {
+  /* --- Type scale ------------------------------------------------- */
+  .t-h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+  .t-h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+  }
+  .t-h4 {
+    font-size: 1.65rem;
+    letter-spacing: -0.01em;
+  }
+  .t-h5 {
+    font-size: 1.1rem;
+    line-height: 1.5;
+  }
+  /* Eyebrow / label style. */
+  .t-eyebrow {
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  /* Card titles deliberately opt out of the eyebrow uppercase treatment. */
+  .t-card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .t-body1 {
+    font-size: 0.98rem;
+    line-height: 1.6;
+  }
+  .t-body2 {
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+
+  /* --- Surfaces --------------------------------------------------- */
+  .card {
+    border: 1px solid var(--brand-border);
+    background-color: var(--surface-card);
+    background-image: none;
+  }
+  .card-inset {
+    border: 1px solid var(--brand-border);
+    background-color: var(--surface-inset);
+  }
+  .panel {
+    border: 1px solid var(--brand-border);
+    background-color: var(--surface-panel);
+  }
+
+  /* --- Controls --------------------------------------------------- */
+  .btn {
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding-inline: 0.95rem;
+    padding-block: 0.5rem;
+    border: 1px solid var(--brand-primary);
+    color: var(--brand-primary);
+    background-color: transparent;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .btn:hover:not(:disabled) {
+    background-color: var(--accent-hairline);
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    border-color: var(--brand-slate-600);
+    color: var(--brand-slate-500);
+    background-color: transparent;
+  }
+  .btn-contained {
+    background-color: var(--brand-primary-pressed);
+    border-color: var(--brand-primary-pressed);
+    color: var(--brand-text);
+  }
+  .btn-contained:hover:not(:disabled) {
+    background-color: var(--brand-primary);
+    border-color: var(--brand-primary);
+  }
+  .btn-quiet {
+    border-color: transparent;
+    color: var(--brand-text-secondary);
+    text-transform: uppercase;
+  }
+  .btn-quiet:hover:not(:disabled) {
+    background-color: transparent;
+    color: var(--brand-primary);
+  }
+
+  .input {
+    font-family: inherit;
+    font-size: 0.88rem;
+    border: 1px solid var(--brand-border);
+    background-color: var(--surface-input);
+    color: var(--brand-text);
+    padding: 0.45rem 0.6rem;
+  }
+  .input::placeholder {
+    color: var(--brand-slate-600);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+  }
+
+  /* --- Idioms ----------------------------------------------------- */
+  /* Active state: 3px primary left border, text kept in alignment. */
+  .active-rule {
+    border-left: 3px solid var(--brand-primary);
+    padding-left: 0.75rem;
+    margin-left: -0.75rem;
+  }
+  /* Brand hero glow, as a decorative overlay rather than a block background:
+     positioned absolutely so it costs no layout height, and fading to
+     transparent (instead of the spec's opaque slate stops) so it washes over
+     the page grid without leaving a seam where the overlay ends. */
+  .hero-glow {
+    background-image: radial-gradient(
+      ellipse 120% 100% at 50% 0%,
+      rgba(6, 182, 212, 0.14),
+      rgba(6, 182, 212, 0.04) 45%,
+      transparent 75%
+    );
+  }
 }
