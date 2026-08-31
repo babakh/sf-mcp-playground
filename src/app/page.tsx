@@ -384,8 +384,8 @@ export default function Home() {
           <span className="h-4 w-px bg-line" />
           <h1 className="t-card-title">Salesforce MCP Playground</h1>
           <div className="ml-auto flex items-center gap-5">
-            <Link href="/setup" target="_blank" className="btn btn-quiet px-0">
-              Setup Guide
+            <Link href="/help" target="_blank" className="btn btn-quiet px-0">
+              Help
             </Link>
             <a
               href="https://github.com/babakh/sf-mcp-playground"
