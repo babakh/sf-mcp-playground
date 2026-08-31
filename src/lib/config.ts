@@ -13,9 +13,67 @@ export const KNOWN_ENDPOINTS: Record<string, string> = {
 
 export const DEFAULT_ENDPOINT = "headless-360";
 
+/**
+ * Sentinel endpoint value for a user-supplied MCP server URL — e.g. a custom
+ * server exposing Apex classes as MCP tools, which has no fixed name to put
+ * in KNOWN_ENDPOINTS. Selecting it in the UI reveals a URL field instead of
+ * showing a resolved KNOWN_ENDPOINTS entry.
+ */
+export const CUSTOM_ENDPOINT = "custom";
+
 export const CLAUDE_MODEL = "claude-sonnet-4-6";
 
-export function resolveMcpUrl(endpoint?: string): string {
+/**
+ * Hosts this app will POST to — shared by the Login URL (OAuth token
+ * exchange) and a custom MCP server URL. Both are server-side outbound
+ * requests driven by caller input, so without this allowlist either field is
+ * a server-side request forgery vector: the route would POST to whatever
+ * host the caller names and return the response in the trace, which on a
+ * public deployment makes it an open proxy anyone can drive.
+ *
+ * Matching is on the parsed hostname, so `https://evil.com/?x=.salesforce.com`,
+ * `https://salesforce.com.evil.com`, and `https://evil-salesforce.com` are all
+ * rejected. Every Hosted MCP server and OAuth token endpoint Salesforce issues
+ * lives under .salesforce.com (login, test, My Domain, and the api.salesforce.com
+ * MCP gateway); extend this list if you need another.
+ */
+const ALLOWED_SALESFORCE_HOST = "salesforce.com";
+
+function validateSalesforceUrl(url: string, fieldLabel: string, example?: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`${fieldLabel} is not a valid URL: ${url}`);
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error(`${fieldLabel} must use https.`);
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (host !== ALLOWED_SALESFORCE_HOST && !host.endsWith(`.${ALLOWED_SALESFORCE_HOST}`)) {
+    throw new Error(
+      `${fieldLabel} host "${host}" is not a Salesforce domain. ` +
+        `Expected ${ALLOWED_SALESFORCE_HOST} or a subdomain of it` +
+        (example ? `, e.g. ${example}.` : ".")
+    );
+  }
+
+  return url.replace(/\/$/, "");
+}
+
+export function resolveMcpUrl(endpoint?: string, customMcpUrl?: string): string {
+  if (endpoint === CUSTOM_ENDPOINT) {
+    if (!customMcpUrl) {
+      throw new Error("No custom MCP server URL provided. Enter one in the UI.");
+    }
+    return validateSalesforceUrl(
+      customMcpUrl,
+      "MCP server URL",
+      "https://api.salesforce.com/platform/mcp/v1/platform/<your-server>"
+    );
+  }
   return KNOWN_ENDPOINTS[endpoint || DEFAULT_ENDPOINT] ?? KNOWN_ENDPOINTS[DEFAULT_ENDPOINT];
 }
 
@@ -27,43 +85,9 @@ export function resolveAccessToken(token?: string): string | undefined {
   return token;
 }
 
-/**
- * Hosts this app will POST credentials to. Without this allowlist the loginUrl
- * field is a server-side request forgery vector: the route POSTs to whatever
- * host the caller names and returns the response body in the trace, which on a
- * public deployment makes it an open proxy anyone can drive.
- *
- * Matching is on the parsed hostname, so `https://evil.com/?x=.salesforce.com`,
- * `https://salesforce.com.evil.com`, and `https://evil-salesforce.com` are all
- * rejected. Every Salesforce OAuth token endpoint lives under .salesforce.com
- * (login, test, and My Domain); extend this list if you need another.
- */
-const ALLOWED_LOGIN_HOST = "salesforce.com";
-
 export function resolveLoginUrl(loginUrl?: string): string | undefined {
   if (!loginUrl) return undefined;
-
-  let parsed: URL;
-  try {
-    parsed = new URL(loginUrl);
-  } catch {
-    throw new Error(`Login URL is not a valid URL: ${loginUrl}`);
-  }
-
-  if (parsed.protocol !== "https:") {
-    throw new Error("Login URL must use https.");
-  }
-
-  const host = parsed.hostname.toLowerCase();
-  if (host !== ALLOWED_LOGIN_HOST && !host.endsWith(`.${ALLOWED_LOGIN_HOST}`)) {
-    throw new Error(
-      `Login URL host "${host}" is not a Salesforce domain. ` +
-        `Expected ${ALLOWED_LOGIN_HOST} or a subdomain of it, ` +
-        `e.g. https://<your-domain>.my.salesforce.com.`
-    );
-  }
-
-  return loginUrl.replace(/\/$/, "");
+  return validateSalesforceUrl(loginUrl, "Login URL", "https://<your-domain>.my.salesforce.com");
 }
 
 export function resolveClientId(clientId?: string): string | undefined {

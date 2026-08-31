@@ -69,6 +69,7 @@ export async function POST(request: Request) {
 
   const {
     endpoint,
+    customMcpUrl,
     accessToken,
     clientId,
     clientSecret,
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
     userText,
   }: {
     endpoint?: string;
+    customMcpUrl?: string;
     accessToken?: string;
     clientId?: string;
     clientSecret?: string;
@@ -88,7 +90,7 @@ export async function POST(request: Request) {
   } = body;
 
   try {
-    const mcpUrl = resolveMcpUrl(endpoint);
+    const mcpUrl = resolveMcpUrl(endpoint, customMcpUrl);
     const { token } = await resolveOrFetchAccessToken({ accessToken, clientId, clientSecret, loginUrl }, trace);
     const apiKey = resolveAnthropicKey(anthropicKey);
     const anthropic = new Anthropic({ apiKey });

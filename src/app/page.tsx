@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Answer } from "@/components/Answer";
 import { SetupGuide } from "@/components/SetupGuide";
 import { TraceLog } from "@/components/TraceLog";
-import { KNOWN_ENDPOINTS } from "@/lib/config";
+import { CUSTOM_ENDPOINT, KNOWN_ENDPOINTS } from "@/lib/config";
 import {
   SECRET_KEYS,
   clearAllPersisted,
@@ -29,6 +29,9 @@ type DiscoverResult = {
 
 export default function Home() {
   const [endpoint, setEndpoint] = useState("headless-360");
+  // Only meaningful when endpoint === CUSTOM_ENDPOINT — e.g. a custom server
+  // exposing Apex classes as MCP tools, which has no fixed name to look up.
+  const [customMcpUrl, setCustomMcpUrl] = useState("");
 
   const [authMethod, setAuthMethod] = useState<AuthMethod>("token");
   const [accessToken, setAccessToken] = useState("");
@@ -147,6 +150,7 @@ export default function Home() {
   // on every request.
   const connectionParams = () => ({
     endpoint,
+    customMcpUrl: endpoint === CUSTOM_ENDPOINT ? customMcpUrl || undefined : undefined,
     ...(authMethod === "clientCredentials" && resolvedAccessToken
       ? { accessToken: resolvedAccessToken }
       : bootstrapAuthParams()),
@@ -165,8 +169,13 @@ export default function Home() {
     try {
       const { res, data, ms } = await timedPost(
         "/api/introspect",
-        { endpoint, ...bootstrapAuthParams(), mode: "handshake" },
-        `Connect \u2192 ${endpoint}`
+        {
+          endpoint,
+          customMcpUrl: endpoint === CUSTOM_ENDPOINT ? customMcpUrl || undefined : undefined,
+          ...bootstrapAuthParams(),
+          mode: "handshake",
+        },
+        `Connect \u2192 ${endpoint === CUSTOM_ENDPOINT ? "custom server" : endpoint}`
       );
       setConnectMs(ms);
       if (!res.ok) throw new Error(data.error ?? "Connection failed");
@@ -251,7 +260,11 @@ export default function Home() {
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const savedEndpoint = readPersisted("local", "endpoint");
-    if (savedEndpoint && savedEndpoint in KNOWN_ENDPOINTS) setEndpoint(savedEndpoint);
+    if (savedEndpoint && (savedEndpoint in KNOWN_ENDPOINTS || savedEndpoint === CUSTOM_ENDPOINT)) {
+      setEndpoint(savedEndpoint);
+    }
+    const savedCustomMcpUrl = readPersisted("local", "customMcpUrl");
+    if (savedCustomMcpUrl) setCustomMcpUrl(savedCustomMcpUrl);
 
     const savedMethod = readPersisted("local", "authMethod");
     if (savedMethod === "token" || savedMethod === "clientCredentials") {
@@ -282,10 +295,11 @@ export default function Home() {
   useEffect(() => {
     if (!hydrated) return;
     writePersisted("local", "endpoint", endpoint);
+    writePersisted("local", "customMcpUrl", customMcpUrl);
     writePersisted("local", "authMethod", authMethod);
     writePersisted("local", "loginUrl", loginUrl);
     writePersisted("local", "clientId", clientId);
-  }, [hydrated, endpoint, authMethod, loginUrl, clientId]);
+  }, [hydrated, endpoint, customMcpUrl, authMethod, loginUrl, clientId]);
 
   // Secrets: only while opted in, and unticking the box wipes them immediately.
   useEffect(() => {
@@ -459,7 +473,7 @@ export default function Home() {
                 title="Authenticated"
               />
               <span className="t-eyebrow truncate text-[0.7rem] text-muted lg:[writing-mode:vertical-rl]">
-                {endpoint}
+                {endpoint === CUSTOM_ENDPOINT ? "custom server" : endpoint}
               </span>
             </section>
           ) : (
@@ -493,10 +507,21 @@ export default function Home() {
                     <option value="sobject-mutations">sobject-mutations</option>
                     <option value="salesforce-api-context">salesforce-api-context</option>
                     <option value="data360">data360</option>
+                    <option value={CUSTOM_ENDPOINT}>Custom MCP server…</option>
                   </select>
-                  <p className="mt-2 font-mono text-[0.7rem] break-all text-dimmer">
-                    {KNOWN_ENDPOINTS[endpoint]}
-                  </p>
+                  {endpoint === CUSTOM_ENDPOINT ? (
+                    <input
+                      value={customMcpUrl}
+                      onChange={(e) => setCustomMcpUrl(e.target.value)}
+                      placeholder="https://api.salesforce.com/platform/mcp/v1/platform/<your-server>"
+                      aria-label="MCP server URL"
+                      className="input mt-2 w-full font-mono text-[0.78rem]"
+                    />
+                  ) : (
+                    <p className="mt-2 font-mono text-[0.7rem] break-all text-dimmer">
+                      {KNOWN_ENDPOINTS[endpoint]}
+                    </p>
+                  )}
                 </div>
               </div>
 

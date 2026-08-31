@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const mode: "handshake" | "discover" = body.mode === "discover" ? "discover" : "handshake";
 
   try {
-    const url = resolveMcpUrl(body.endpoint);
+    const url = resolveMcpUrl(body.endpoint, body.customMcpUrl);
     const { token: accessToken, issuedAt, expiresAt } = await resolveOrFetchAccessToken(
       { accessToken: body.accessToken, clientId: body.clientId, clientSecret: body.clientSecret, loginUrl: body.loginUrl },
       trace

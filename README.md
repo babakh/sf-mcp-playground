@@ -167,6 +167,12 @@ The descriptions above are inferred from the endpoint names — check each serve
 Start with a read-only endpoint (`sobject-reads`) while you're finding your footing — several of
 these can modify or delete records in a real org.
 
+**Custom MCP server.** Salesforce also lets you expose Apex classes as MCP tools on a custom
+Hosted MCP server — same activation flow in Setup, same External Client App OAuth. Pick **Custom
+MCP server…** from the dropdown and paste in the Server URL Setup gives you. The URL is validated
+server-side against the same allowlist as the Login URL (must resolve to `salesforce.com` or a
+subdomain, over https) — see `resolveMcpUrl` in `src/lib/config.ts`.
+
 ## Using it
 
 **01 Select an MCP endpoint** — pick one from the dropdown. The URL it resolves to is shown
