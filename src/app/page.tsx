@@ -55,6 +55,10 @@ export default function Home() {
   const [userText, setUserText] = useState("");
   const [sending, setSending] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
+  // The in-flight question, shown in the transcript with a "thinking"
+  // placeholder in Claude's slot — otherwise there's a stretch where neither
+  // the question nor an answer is visible, just a disabled Send button.
+  const [pendingUser, setPendingUser] = useState<string | null>(null);
 
   // Once connected the auth card collapses to a summary; this reopens it so
   // credentials can be changed without losing the existing connection.
@@ -203,6 +207,7 @@ export default function Home() {
     setChatError(null);
     const text = userText;
     setUserText("");
+    setPendingUser(text);
     const sentAt = Date.now();
     try {
       const { res, data, ms } = await timedPost(
@@ -220,6 +225,7 @@ export default function Home() {
       setChatError(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
+      setPendingUser(null);
     }
   }
 
@@ -294,7 +300,7 @@ export default function Home() {
   useEffect(() => {
     const el = transcriptRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [turns.length]);
+  }, [turns.length, pendingUser]);
 
   useEffect(() => {
     if (tokenExpiresAt === null) return;
@@ -778,7 +784,7 @@ export default function Home() {
                 )}
               </div>
               <div className="p-5">
-                {turns.length > 0 && (
+                {(turns.length > 0 || pendingUser !== null) && (
                   <div
                     ref={transcriptRef}
                     className="mb-4 flex max-h-[32rem] flex-col divide-y divide-line overflow-auto motion-safe:scroll-smooth"
@@ -814,9 +820,35 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
+                    {pendingUser !== null && (
+                      <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0">
+                        <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-[4.5rem_1fr]">
+                          <div className="pt-0.5">
+                            <span className="t-eyebrow block text-[0.66rem] text-dim">You</span>
+                          </div>
+                          <p className="t-body2 min-w-0 border-l-[3px] border-transparent pl-3 text-softer">
+                            {pendingUser}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-x-3 gap-y-1 sm:grid-cols-[4.5rem_1fr]">
+                          <div className="pt-0.5">
+                            <span className="t-eyebrow block text-[0.66rem] text-primary">
+                              Claude
+                            </span>
+                          </div>
+                          <div className="min-w-0 border-l-[3px] border-primary pl-3">
+                            <span className="thinking-dots text-primary" role="status" aria-label="Claude is working">
+                              <span />
+                              <span />
+                              <span />
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-                {turns.length === 0 && (
+                {turns.length === 0 && pendingUser === null && (
                   <p className="t-body2 mb-4 text-muted">
                     Ask a question in plain English. Claude decides which of the server&rsquo;s
                     tools to call, runs them against your org, and answers from the results — every
