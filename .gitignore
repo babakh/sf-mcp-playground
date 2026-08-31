@@ -38,6 +38,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Salesforce CLI local project state — created wherever `sf` happens to be
+# run from, unrelated to this app. Not meant to be committed.
+.sf/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
