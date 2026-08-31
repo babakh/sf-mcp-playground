@@ -66,9 +66,11 @@ export default function Home() {
   const [tokenRevealed, setTokenRevealed] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
   const [tokenExpiresAt, setTokenExpiresAt] = useState<number | null>(null);
-  // Once connected, the setup column can fold to a rail so chat and the log
-  // get the width. Never collapsed while disconnected — the form is the only
-  // thing to do at that point.
+  // The setup column can fold to a rail so chat and the log get the width.
+  // Toggled manually via the splitter, and auto-collapsed once on the first
+  // chat send (see autoCollapsedRef) — never collapsed while disconnected,
+  // since the form is the only thing to do at that point (gated by
+  // `collapsed` below, not here).
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   // The key field folds away once set — it is entered once and then just
   // occupies a row between the transcript and the message box.
@@ -87,6 +89,9 @@ export default function Home() {
   const [now, setNow] = useState(() => Date.now());
 
   const transcriptRef = useRef<HTMLDivElement>(null);
+  // Auto-collapse fires once, on the first Send — not on every send, so it
+  // never fights a manual re-expand later in the session.
+  const autoCollapsedRef = useRef(false);
   // Snapshot of the committed auth state, taken when "Change" opens the form.
   // "Cancel" restores it, so abandoning an edit can't leave a corrupted field
   // or a stale minted token behind.
@@ -203,6 +208,10 @@ export default function Home() {
 
   async function handleSend() {
     if (!userText.trim()) return;
+    if (!autoCollapsedRef.current) {
+      autoCollapsedRef.current = true;
+      setLeftCollapsed(true);
+    }
     setSending(true);
     setChatError(null);
     const text = userText;
